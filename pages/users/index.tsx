@@ -1,4 +1,4 @@
-import { FC, useEffect, useState, SelectHTMLAttributes } from 'react'
+import { FC, useEffect, useState } from 'react'
 import { IUser } from '../../libs/user'
 import Axios from 'axios'
 
@@ -22,32 +22,26 @@ const User: FC<UserProps> = ({ id, firstName, lastName }) => {
   )
 }
 
-interface OptionProps {
-  name: number
-  value: number
-}
-
 interface SelectProps {
   label: string
-  options: OptionProps[]
-  value?: OptionProps
-  onSelect?: (value: OptionProps) => void
+  options: number[]
+  value?: number
+  onSelect?: (value: number) => void
 }
 
 const Select: FC<SelectProps> = ({ label, options, value, onSelect }) => {
-  if (value && options.includes(value)) throw Error('value must be included in the options')
+  if (value && !options.includes(value)) throw Error('value must be included in options')
 
   return (
     <div>
       <label>{label}: </label>
-
       <select 
         onChange={e => {
-          const option = options.find(item => e.currentTarget.value === item.value.toString())
+          const option = options.find(item => e.currentTarget.value === item.toString())
           onSelect && onSelect(option)
         }}
-        value={value?.value || options[0].value}>
-        {options.map(({ name, value }) => <option value={value}>{name}</option>)}
+        value={value || options[0]}>
+        {options.map((value, index) => <option key={index} value={value}>{value}</option>)}
       </select>
     </div>
   )
@@ -60,9 +54,10 @@ const Users = () => {
   const [loading, setLoading] = useState<boolean>(false)
   const [limit, setLimit] = useState<number>(5)
   const [page, setPage] = useState<number>(0)
-  const [totalPages, setTotalPages] = useState<number>(0)
+  const [totalPages, setTotalPages] = useState<number>(1)
 
   useEffect(() => {
+    let cancelSource = Axios.CancelToken.source()
     const fetch = async () => {
       setLoading(true)
       const response = await Axios.get<UsersResponse>(
@@ -70,7 +65,8 @@ const Users = () => {
           headers: {
             'app-id': '5ffd1117af6833ab2dd0a2b4',
           },
-          params: { limit, page }
+          params: { limit, page },
+          cancelToken: cancelSource.token
         })
       const { data: users, total } = response.data
 
@@ -80,13 +76,12 @@ const Users = () => {
     }
 
     fetch()
+    return () => cancelSource.cancel()
   }, [limit, page])
-
-  console.log(page, totalPages)
 
   useEffect(() => {
     setPage(0)
-    setTotalPages(0)
+    setTotalPages(1)
   }, [limit])
 
   return (
@@ -97,16 +92,14 @@ const Users = () => {
       <div style={{ display: 'flex'}}>
         <Select 
           label={'Limit'} 
-          options={pageLimits.map<OptionProps>(item => ({ name: item, value: item }))}
-          value={{ name: limit, value: limit }}
-          onSelect={item => setLimit(item.value as number)} />
+          options={pageLimits}
+          value={limit}
+          onSelect={item => setLimit(item)} />
         <Select 
           label={'Page'}
-          options={totalPages !== 0 
-            ? Array(totalPages).fill(null).map((_, index) => ({ name: index, value: index }))
-            : [{ name: 0, value: 0 }]} 
-          value={{ name: page, value: page }}
-          onSelect={item => setPage(item.value)} />
+          options={Array(totalPages).fill(null).map((_, index) => index)} 
+          value={page}
+          onSelect={item => setPage(item)} />
       </div>
     </div>
   )
